@@ -17,7 +17,7 @@
 </main><footer>lumora · inspiration, collected together</footer>
 <dialog id="detail"><img id="detailImg" alt="Selected pin"><h3 id="detailTitle"></h3><div class="row"><a id="download" class="btn" download>Download image</a><button id="saveBtn">♡ Save</button><button id="closeDetail">Close</button></div><h4>Comments</h4><div id="comments" class="comments"></div><div class="row"><input id="commentText" maxlength="500" placeholder="Write a comment…"><button id="commentBtn" class="primary">Post</button></div><p class="small">Comments and saves require a signed-in account in online mode.</p></dialog>
 <script>
-const SUPABASE_URL="PASTE_SUPABASE_PROJECT_URL_HERE",SUPABASE_ANON_KEY="PASTE_SUPABASE_ANON_KEY_HERE";
+const SUPABASE_URL="https://pnotuhppatqcpikzeivp.supabase.co",SUPABASE_ANON_KEY="sb_publishable_GU27Ycqlt8eSF0_Pte8ZRQ_I2nkDg3K";
 let sb=null,user=null,mode="signup",category="All",pins=[],selected=null,savedIds=new Set(),comments=[],reelsMode=false,localReels=[],onlineReels=[];
 const $=id=>document.getElementById(id);
 const demo=[
