@@ -15,7 +15,7 @@
 <div id="status" class="status">Loading Lumora…</div>
 <section id="reelsSection" class="hidden"><div class="section-title"><div><h2>Reels</h2><p class="muted">Short videos, little moments, your mood.</p></div><button id="reelsBack">← Back to ideas</button></div><div class="panel"><h3>Share a reel</h3><div class="row"><input id="reelFile" type="file" accept="video/mp4,video/webm,video/quicktime"><input id="reelTitle" maxlength="100" placeholder="Reel title"><button id="reelPost" class="primary">Publish reel</button></div><textarea id="reelDescription" maxlength="1000" placeholder="Reel caption (optional)"></textarea><p class="small">MP4/WebM/MOV, max 50 MB. Video audio plays after the viewer taps play/unmute.</p></div><div id="reelsGrid" class="reels-grid"></div></section>
 <section id="gallery" class="masonry"></section><div id="empty" class="empty hidden">Nothing here yet.</div>
-<section id="profilePanel" class="panel hidden"><div class="section-title"><h3 id="profileHeading">My profile</h3><button id="profileEditBtn">Edit profile</button></div><div class="profile-grid"><img id="avatar" class="avatar" alt="Profile avatar"><div><p id="profileInfo" class="muted">Sign in to view your profile and saved pins.</p><p id="profileBio"></p><div class="row"><span id="followerCount" class="badge">0 followers</span><span id="followingCount" class="badge">0 following</span><button id="followMeBtn" class="hidden">Follow</button></div></div></div><div id="profileEdit" class="hidden panel"><input id="editUsername" maxlength="30" placeholder="Username"><textarea id="editBio" maxlength="300" placeholder="A little about you"></textarea><button id="saveProfileBtn" class="primary">Save profile</button></div><div class="toolbar"><button id="myPostsBtn">My posts</button><button id="savedPostsBtn">Saved pins</button><button id="followingBtn">Following</button></div><div id="profilePosts" class="list"></div><button id="signOut" class="hidden">Sign out</button></section>
+<section id="profilePanel" class="panel hidden"><div class="section-title"><h3 id="profileHeading">My profile</h3><button id="profileEditBtn">Edit profile</button></div><div class="profile-grid"><img id="avatar" class="avatar" alt="Profile avatar"> <div>   <input id="avatarFile" type="file" accept="image/png,image/jpeg,image/webp">   <button id="uploadAvatarBtn" class="primary">Upload picture</button> </div><div><p id="profileInfo" class="muted">Sign in to view your profile and saved pins.</p><p id="profileBio"></p><div class="row"><span id="followerCount" class="badge">0 followers</span><span id="followingCount" class="badge">0 following</span><button id="followMeBtn" class="hidden">Follow</button></div></div></div><div id="profileEdit" class="hidden panel"><input id="editUsername" maxlength="30" placeholder="Username"><textarea id="editBio" maxlength="300" placeholder="A little about you"></textarea><button id="saveProfileBtn" class="primary">Save profile</button></div><div class="toolbar"><button id="myPostsBtn">My posts</button><button id="savedPostsBtn">Saved pins</button><button id="followingBtn">Following</button></div><div id="profilePosts" class="list"></div><button id="signOut" class="hidden">Sign out</button></section>
 <section id="messagesPanel" class="panel hidden"><div class="section-title"><h2>Messages</h2><button id="closeMessages">Close</button></div><p class="small">Enter the exact username of a Lumora member. Messages are private to sender and recipient.</p><div class="row"><input id="messageTo" placeholder="Recipient username"><button id="openConversation" class="primary">Open chat</button></div><div id="chatLog" class="list"></div><div class="row"><input id="messageText" maxlength="2000" placeholder="Write a message…"><button id="sendMessage" class="primary">Send</button></div></section>
 <section id="notificationsPanel" class="panel hidden"><div class="section-title"><h2>Notifications</h2><button id="closeNotifications">Close</button></div><div id="notificationsList" class="list"></div></section>
 </main><footer>lumora · inspiration, collected together</footer>
@@ -63,7 +63,37 @@ async function setup(){if(!SUPABASE_URL.startsWith("https://")||SUPABASE_URL.inc
 $("authBtn").onclick=()=>{if(user){$("profilePanel").classList.toggle("hidden");$("profilePanel").scrollIntoView({behavior:"smooth"})}else $("authPanel").classList.toggle("hidden")};
 $("switchAuth").onclick=()=>{mode=mode==="signup"?"signin":"signup";$("authTitle").textContent=mode==="signup"?"Create your Lumora account":"Welcome back";$("username").classList.toggle("hidden",mode!=="signup");$("authSubmit").textContent=mode==="signup"?"Create account":"Sign in";$("switchAuth").textContent=mode==="signup"?"Already have an account? Sign in":"New here? Create account"};
 $("authSubmit").onclick=async()=>{if(!sb)return say("Set up Supabase first.");let email=$("email").value.trim(),password=$("password").value,username=$("username").value.trim()||email.split("@")[0];try{if(mode==="signup"){let r=await sb.auth.signUp({email,password,options:{data:{username, emailRedirectTo:location.origin+location.pathname}}});if(r.error)throw r.error;if(r.data.user&&r.data.session){user=r.data.user;await sb.from("profiles").upsert({id:user.id,username});await loadProfile()}say("Signup request sent. Check email confirmation if enabled.");}else{let r=await sb.auth.signInWithPassword({email,password});if(r.error)throw r.error;user=r.data.user;await sb.from("profiles").upsert({id:user.id,username:user.user_metadata?.username||email.split("@")[0]});profile=await getProfile(user.id);$("authPanel").classList.add("hidden");await loadPins();await loadProfile();await loadNotifications();say("Signed in successfully.")}updateAuth()}catch(e){say(e.message)}};
-$("signOut").onclick=async()=>{if(sb)await sb.auth.signOut();user=null;profile=null;updateAuth();say("Signed out.")};
+$("uploadAvatarBtn").onclick=async()=>{
+  if(!requireLogin()||!sb)return;
+
+  const f=$("avatarFile").files[0];
+  if(!f)return say("Choose a profile picture first.");
+  if(!f.type.startsWith("image/")||f.size>5*1024*1024)
+    return say("Choose an image under 5 MB.");
+
+  try{
+    say("Uploading profile picture...");
+    const path=user.id+"/"+crypto.randomUUID()+"-"+f.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+    const up=await sb.storage.from("avatars").upload(path,f,{upsert:false,contentType:f.type});
+    if(up.error)throw up.error;
+
+    const url=sb.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+    const r=await sb.from("profiles").upsert({
+      id:user.id,
+      username:profile?.username||user.email.split("@")[0],
+      bio:profile?.bio||"",
+      avatar_url:url
+    });
+    if(r.error)throw r.error;
+
+    profile=await getProfile(user.id);
+    updateAuth();
+    $("avatarFile").value="";
+    say("Profile picture updated!");
+  }catch(e){
+    say("Upload failed: "+e.message);
+  }
+};$("signOut").onclick=async()=>{if(sb)await sb.auth.signOut();user=null;profile=null;updateAuth();say("Signed out.")};
 $("addBtn").onclick=()=>{if(!requireLogin())return;$("uploadPanel").classList.toggle("hidden");$("uploadPanel").scrollIntoView({behavior:"smooth"})};
 $("postBtn").onclick=async()=>{if(!requireLogin()||!sb)return;let f=$("imageFile").files[0],title=$("pinTitle").value.trim();if(!f||!title)return say("Choose an image and add a title.");if(!f.type.startsWith("image/")||f.size>8*1024*1024)return say("Choose an image under 8 MB.");try{say("Uploading image…");let path=user.id+"/"+crypto.randomUUID()+"-"+f.name.replace(/[^a-zA-Z0-9._-]/g,"_");let up=await sb.storage.from("lumora").upload(path,f,{contentType:f.type});if(up.error)throw up.error;let url=sb.storage.from("lumora").getPublicUrl(path).data.publicUrl;let r=await sb.from("pins").insert({title,category:$("pinCategory").value,image_url:url,description:$("pinDescription").value.trim(),user_id:user.id});if(r.error)throw r.error;await loadPins();await loadProfile();$("imageFile").value="";$("pinTitle").value="";$("pinDescription").value="";say("Your pin is published.")}catch(e){say("Publish failed: "+e.message)}};
 $("commentBtn").onclick=async()=>{let body=$("commentText").value.trim();if(!body||!selected)return;if(!requireLogin()||isDemo(selected.id))return say("Sign in and open a published pin to comment.");let r=await sb.from("comments").insert({pin_id:selected.id,user_id:user.id,body});if(r.error)return say(r.error.message);await notify(selected.user_id,"comment",selected.id);$("commentText").value="";await openPin(selected.id);say("Comment posted.")};
